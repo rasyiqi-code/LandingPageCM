@@ -1,0 +1,110 @@
+"use client";
+
+import React, { useState, useEffect, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+
+interface TypingHeroTitleProps {
+    prefix: string;
+    targets: string[];
+    mode?: "typing" | "rapid";
+    isPaused?: boolean; // Prop baru untuk mengontrol mode rapid dari luar
+    onStateChange?: (state: "typing" | "full" | "deleting") => void;
+}
+
+/**
+ * TypingHeroTitle: Mendukung efek typing tradisional atau switch cepat (rapid).
+ */
+export function TypingHeroTitle({ prefix, targets, mode = "typing", isPaused, onStateChange }: TypingHeroTitleProps) {
+    const safeTargets = useMemo(() =>
+        targets && targets.length > 0 ? targets : ["Solutions"],
+        [targets]);
+
+    const [targetIndex, setTargetIndex] = useState(0);
+    const [displayText, setDisplayText] = useState(safeTargets[0] || "");
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [typingSpeed, setTypingSpeed] = useState(150);
+
+    // Effect untuk mode "rapid" - Dikontrol oleh isPaused jika ada
+    useEffect(() => {
+        if (mode !== "rapid" || isPaused) return;
+
+        const interval = setInterval(() => {
+            setTargetIndex((prev) => (prev + 1) % safeTargets.length);
+        }, 600); // Sesuai pilihan user terakhir
+        return () => clearInterval(interval);
+    }, [safeTargets.length, mode, isPaused]);
+
+    // Effect untuk mode "typing"
+    useEffect(() => {
+        if (mode !== "typing") return;
+
+        const currentTarget = safeTargets[targetIndex];
+        if (!currentTarget) return;
+
+        const handleTyping = () => {
+            if (!isDeleting) {
+                if (displayText === currentTarget) {
+                    onStateChange?.("full");
+                    // Pause selama 1800ms dengan menyetel typingSpeed iterasi berikutnya
+                    setIsDeleting(true);
+                    setTypingSpeed(1800);
+                } else {
+                    onStateChange?.("typing");
+                    setDisplayText(currentTarget.slice(0, displayText.length + 1));
+                    setTypingSpeed(100);
+                }
+            } else {
+                onStateChange?.("deleting");
+                setDisplayText(currentTarget.slice(0, displayText.length - 1));
+                setTypingSpeed(50);
+
+                if (displayText === "") {
+                    setIsDeleting(false);
+                    setTargetIndex((targetIndex + 1) % safeTargets.length);
+                }
+            }
+        };
+
+        const timer = setTimeout(handleTyping, typingSpeed);
+        return () => clearTimeout(timer);
+    }, [displayText, isDeleting, targetIndex, safeTargets, typingSpeed, mode, onStateChange]);
+
+    return (
+        <span className="inline-flex flex-row items-center justify-center lg:justify-start gap-x-2 md:gap-x-4 whitespace-nowrap overflow-visible">
+            <span className="text-white shrink-0">{prefix}</span>
+            {/* Optimasi CLS: Menentukan lebar tetap (fixed width) yang stabil dan rata kiri (justify-start) agar tidak menyebabkan pergeseran tata letak (layout shift) saat huruf diketik atau teks berganti */}
+            <span className="relative inline-flex items-center h-[1.2em] w-[160px] sm:w-[180px] md:w-[250px] lg:w-[300px] justify-start shrink-0">
+                {mode === "rapid" ? (
+                    <AnimatePresence mode="wait">
+                        <motion.span
+                            key={targetIndex}
+                            initial={{ opacity: 0, y: 10, filter: "blur(8px)" }}
+                            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                            exit={{ opacity: 0, y: -10, filter: "blur(8px)" }}
+                            transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+                            className="text-transparent bg-clip-text bg-gradient-to-r from-brand-yellow via-yellow-200 to-brand-yellow animate-gradient-x bg-[length:200%_auto] block text-left w-full"
+                        >
+                            {safeTargets[targetIndex]}
+                        </motion.span>
+                    </AnimatePresence>
+                ) : (
+                    <span className="relative inline-flex items-center justify-start w-full">
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-yellow via-yellow-200 to-brand-yellow animate-gradient-x bg-[length:200%_auto] block text-left">
+                            {displayText}
+                        </span>
+                        <span 
+                            className="inline-block w-[3px] h-[0.8em] bg-brand-yellow ml-1.5 shrink-0"
+                            style={{ animation: 'typing-cursor-blink 1s steps(2, start) infinite' }}
+                        />
+                        <style dangerouslySetInnerHTML={{ __html: `
+                            @keyframes typing-cursor-blink {
+                                0%, 100% { opacity: 1; }
+                                50% { opacity: 0; }
+                            }
+                        `}} />
+                    </span>
+                )}
+            </span>
+        </span>
+    );
+}

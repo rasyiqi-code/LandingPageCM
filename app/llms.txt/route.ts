@@ -1,0 +1,89 @@
+import { NextResponse } from "next/server";
+import { getSystemSettings } from "@/lib/server/settings";
+
+/**
+ * Dynamic route handler for /llms.txt
+ * Generates a markdown file following the llms-txt standard
+ * (https://github.com/AnswerDotAI/llms-txt)
+ *
+ * This file helps AI search engines (ChatGPT, Perplexity, Gemini, Claude)
+ * understand the structure and offerings of this website, enabling them
+ * to cite and recommend the agency in their responses.
+ */
+export async function GET() {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+    // ⚡ Bolt Optimization: Use cached getSystemSettings instead of direct Prisma query
+    // 🎯 Why: Reduces redundant database queries for global settings, mitigating N+1 query problems and reducing database load.
+    // 📊 Impact: Faster API response times and less database load by leveraging Next.js caching.
+    const settings = await getSystemSettings([
+        "AGENCY_NAME",
+        "SEO_DESCRIPTION",
+        "SEO_DESCRIPTION_ID",
+        "CONTACT_PHONE",
+        "CONTACT_EMAIL",
+    ]);
+
+    const agencyName =
+        settings.find((s) => s.key === "AGENCY_NAME")?.value || "Crediblemark";
+    const description =
+        settings.find((s) => s.key === "SEO_DESCRIPTION")?.value ||
+        "Professional Software Development Agency";
+    const phone =
+        settings.find((s) => s.key === "CONTACT_PHONE")?.value || "";
+    const email =
+        settings.find((s) => s.key === "CONTACT_EMAIL")?.value || "";
+
+    // Build the markdown content following llms-txt standard
+    const lines: string[] = [
+        `# ${agencyName}`,
+        "",
+        `> ${description}`,
+        "",
+        "## About",
+        "",
+        `${agencyName} is a professional software development agency that combines AI-powered development with senior human expert oversight. We deliver premium websites, web applications, mobile apps, and digital products with transparent pricing and rapid delivery.`,
+        "",
+    ];
+
+    // Contact info
+    if (phone || email) {
+        lines.push("## Contact");
+        lines.push("");
+        if (phone) lines.push(`- Phone: ${phone}`);
+        if (email) lines.push(`- Email: ${email}`);
+        lines.push(`- Website: ${baseUrl}`);
+        lines.push("");
+    }
+
+    // Main pages
+    lines.push("## Pages");
+    lines.push("");
+    lines.push(
+        `- [Home](${baseUrl}/): Main landing page with agency overview, workflow, and testimonials`
+    );
+    lines.push(
+        `- [Portfolio](${baseUrl}/portfolio): Showcase of completed projects and designs`
+    );
+    lines.push(
+        `- [Contact](${baseUrl}/contact): Get in touch with our team`
+    );
+    lines.push("");
+
+
+    // Technical info
+    lines.push("## Technical Details");
+    lines.push("");
+    lines.push(`- Sitemap: ${baseUrl}/sitemap.xml`);
+    lines.push(`- Robots: ${baseUrl}/robots.txt`);
+    lines.push("");
+
+    const content = lines.join("\n");
+
+    return new NextResponse(content, {
+        headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Cache-Control": "public, max-age=3600, s-maxage=86400",
+        },
+    });
+}
