@@ -16,7 +16,19 @@ export interface PortfolioItem {
     source?: "database" | "github";
 }
 
-async function fetchGithubReposReal(): Promise<PortfolioItem[]> {
+interface GitHubRepo {
+    id: string | number;
+    name: string;
+    description?: string | null;
+    html_url: string;
+    homepage?: string | null;
+    language?: string | null;
+    fork?: boolean;
+    private?: boolean;
+    created_at: string;
+}
+
+async function fetchRepos(url: string): Promise<GitHubRepo[]> {
     const headers: HeadersInit = {
         Accept: "application/vnd.github.v3+json",
     };
@@ -24,38 +36,40 @@ async function fetchGithubReposReal(): Promise<PortfolioItem[]> {
         headers["Authorization"] = `token ${process.env.GITHUB_PAT}`;
     }
 
+    for (let attempt = 0; attempt < 2; attempt++) {
+        const res = await fetch(url, {
+            headers,
+            next: { revalidate: 2592000 } // Cache 30 hari
+        });
+        if (res.ok) {
+            return (await res.json()) as GitHubRepo[];
+        }
+        console.warn(
+            `[Portfolios] GitHub ${url} -> ${res.status} (attempt ${attempt + 1}, ratelimit remaining: ${res.headers.get("x-ratelimit-remaining")})`
+        );
+        if (attempt === 0) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+    }
+    return [];
+}
+
+async function fetchGithubReposReal(): Promise<PortfolioItem[]> {
     try {
         // Fetch dari user rasyiqi-code
-        const resUser = await fetch("https://api.github.com/users/rasyiqi-code/repos?sort=updated&per_page=10", {
-            headers,
-            next: { revalidate: 2592000 } // Cache 30 hari
-        });
-        const reposUser = resUser.ok ? await resUser.json() : [];
+        const reposUser = await fetchRepos("https://api.github.com/users/rasyiqi-code/repos?sort=updated&per_page=10");
 
         // Fetch dari org crediblemark-official
-        const resOrg = await fetch("https://api.github.com/orgs/crediblemark-official/repos?sort=updated&per_page=10", {
-            headers,
-            next: { revalidate: 2592000 } // Cache 30 hari
-        });
-        const reposOrg = resOrg.ok ? await resOrg.json() : [];
+        const reposOrg = await fetchRepos("https://api.github.com/orgs/crediblemark-official/repos?sort=updated&per_page=10");
 
         // Gabungkan
         const allRepos = [...reposOrg, ...reposUser];
 
         // Filter: Hanya tampilkan repositori publik (karena repositori privat akan memicu error muat gambar di browser)
-        const publicRepos = allRepos.filter((repo: { private?: boolean }) => !repo.private);
+        const publicRepos = allRepos.filter((repo) => !repo.private);
 
         // Map ke PortfolioItem
-        return publicRepos.map((repo: {
-            id: string | number;
-            name: string;
-            description?: string;
-            html_url: string;
-            homepage?: string | null;
-            language?: string | null;
-            fork?: boolean;
-            created_at: string;
-        }) => ({
+        return publicRepos.map((repo: GitHubRepo) => ({
             id: repo.id.toString(),
             title: repo.name.split("-").map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(" "),
             slug: repo.name,
@@ -73,13 +87,31 @@ async function fetchGithubReposReal(): Promise<PortfolioItem[]> {
 }
 
 export async function getPortfolios(): Promise<PortfolioItem[]> {
-    return unstable_cache(
+    const cachedResult = await unstable_cache(
         async () => {
             return await fetchGithubReposReal();
         },
         ["portfolios-list-combined"],
         { revalidate: 3600, tags: ["portfolios"] }
     )();
+
+    // Jika cache kosong (kemungkinan rate-limit saat cache pertama kali diisi),
+    // fetch langsung agar tidak menunggu cache expiry
+    if (cachedResult.length === 0) {
+        const freshResult = await unstable_cache(
+            async () => {
+                return await fetchGithubReposReal();
+            },
+            ["portfolios-list-fallback"],
+            { revalidate: 1 } // Singkat agar tidak nyangkut terlalu lama jika memang kosong
+        )();
+        if (freshResult.length > 0) {
+            // Jika fetch segar menghasilkan data, langsung tampilkan
+            return freshResult;
+        }
+    }
+
+    return cachedResult;
 }
 
 // Pending promise map to handle parallel requests for the same URL in the same process
