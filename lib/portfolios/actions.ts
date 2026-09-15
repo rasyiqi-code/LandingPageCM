@@ -1,7 +1,6 @@
 "use server";
 
 import { safeUnstableCache as unstable_cache } from "@/lib/shared/cache";
-import { fetchRenderedHtml as fetchFromCloudflare } from "@/lib/server/cloudflare-rendering";
 
 export interface PortfolioItem {
     id: string;
@@ -11,7 +10,6 @@ export interface PortfolioItem {
     description?: string;
     externalUrl?: string;
     imageUrl?: string;
-    htmlContent?: string;
     createdAt: Date | string;
     source?: "database" | "github";
 }
@@ -112,47 +110,4 @@ export async function getPortfolios(): Promise<PortfolioItem[]> {
     }
 
     return cachedResult;
-}
-
-// Pending promise map to handle parallel requests for the same URL in the same process
-const pendingRequests = new Map<string, Promise<string>>();
-
-/**
- * Fetches rendered HTML with persistent caching and deduplication.
- */
-export async function getRenderedHtml(url: string, localBaseUrl?: string): Promise<string> {
-    const cacheKey = `portfolio-render-${url}`;
-
-    if (pendingRequests.has(url)) {
-        return pendingRequests.get(url)!;
-    }
-
-    const fetchAction = async () => {
-        return unstable_cache(
-            async () => {
-                try {
-                    return await fetchFromCloudflare(url, localBaseUrl);
-                } catch {
-                    console.warn(`[ProxyCache] Rendering failed for ${url}, using fallback text.`);
-                    return `<html><body><h1>Content currently unavailable</h1><p>${url}</p></body></html>`;
-                }
-            },
-            [cacheKey],
-            { revalidate: 3600 * 6, tags: ["portfolio-render"] } // Cache for 6 hours
-        )();
-    };
-
-    const timeoutPromise = new Promise<never>((_, reject) => {
-        const timer = setTimeout(() => reject(new Error("Cloudflare render timeout")), 20000);
-        timer.unref();
-    });
-
-    const promise = Promise.race([fetchAction(), timeoutPromise]);
-    pendingRequests.set(url, promise);
-
-    try {
-        return await promise;
-    } finally {
-        pendingRequests.delete(url);
-    }
 }

@@ -25,7 +25,7 @@ export async function GET() {
     // Map Portfolios
     for (const item of portfolios) {
         if (item && item.slug) {
-            const link = item.externalUrl || `${baseUrl}/view-design/${item.slug}`;
+            const link = item.externalUrl || `${baseUrl}/portfolio`;
             feedItems.push({
                 title: `[Portfolio] ${item.title}`,
                 link: link,

@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { ExternalLink, Maximize2, Github, Smartphone, Monitor, Code, Star, GitFork } from "lucide-react";
+import { ExternalLink, Github, Smartphone, Monitor, Code, Star, GitFork } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 interface PortfolioCardProps {
     title: string;
     slug: string;
-    html: string;
     category?: string;
     description?: string;
     externalUrl?: string;
@@ -16,9 +15,8 @@ interface PortfolioCardProps {
     source?: "database" | "github";
 }
 
-export function PortfolioCard({ title, slug, html, externalUrl, imageUrl, description, category, source }: PortfolioCardProps) {
+export function PortfolioCard({ title, slug, externalUrl, imageUrl, description, category, source }: PortfolioCardProps) {
     const t = useTranslations("Portfolio");
-    const previewUrl = `/view-design/${slug}`;
     const isGithubSource = source === "github";
     
     // State image dinamis dengan inisialisasi awal ke opsi dinamis realtime (Auto-Screenshot / GitHub)
@@ -126,16 +124,6 @@ export function PortfolioCard({ title, slug, html, externalUrl, imageUrl, descri
                     {/* Dark Overlay Gradient */}
                     <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/80 via-transparent to-transparent opacity-60 group-hover:opacity-30 transition-opacity duration-700 pointer-events-none" />
 
-                    {/* Expand Button — hanya untuk database portfolio */}
-                    {!isGithubSource && (
-                        <Link
-                            href={previewUrl}
-                            className="absolute top-3 right-3 p-2 rounded-full bg-black/40 backdrop-blur-xl text-white/50 hover:text-brand-yellow hover:bg-black/60 transition-all opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 border border-white/10"
-                        >
-                            <Maximize2 className="w-3.5 h-3.5" />
-                        </Link>
-                    )}
-
                     {/* Source Badge */}
                     <div className="absolute bottom-3 left-3 flex items-center gap-2 px-2.5 py-1 bg-black/50 backdrop-blur-xl rounded-full border border-white/10 shadow-lg pointer-events-none">
                         <span className="relative flex h-1.5 w-1.5">
@@ -187,19 +175,9 @@ export function PortfolioCard({ title, slug, html, externalUrl, imageUrl, descri
 
                     {/* CTA Buttons */}
                     <div className="flex items-center gap-2">
-                        {/* Tombol View Design — hanya untuk database source */}
-                        {!isGithubSource && (
-                            <Link
-                                href={previewUrl}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-white/60 hover:text-white rounded-full text-[10px] font-bold transition-all duration-300 border border-white/10 hover:border-white/20 hover:bg-white/5"
-                            >
-                                <Maximize2 className="w-3 h-3" />
-                                {t("viewCase")}
-                            </Link>
-                        )}
                         {/* CTA Utama */}
                         <Link
-                            href={externalUrl || previewUrl}
+                            href={externalUrl || "#"}
                             target={externalUrl ? "_blank" : undefined}
                             className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[10px] font-black transition-all duration-500 border shadow-lg group/btn ${
                                 isGithubSource

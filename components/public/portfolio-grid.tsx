@@ -11,7 +11,6 @@ interface PortfolioItem {
     slug: string;
     category?: string;
     description?: string;
-    html: string;
     externalUrl?: string;
     imageUrl?: string;
     source?: "database" | "github";
@@ -122,7 +121,6 @@ export function PortfolioGrid({ items }: PortfolioGridProps) {
                             slug={item.slug}
                             category={item.category}
                             description={item.description}
-                            html={item.html}
                             externalUrl={item.externalUrl}
                             imageUrl={item.imageUrl}
                             source={item.source}

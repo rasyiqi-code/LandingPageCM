@@ -54,7 +54,7 @@ export async function GET() {
     for (const portfolio of portfolios) {
         if (portfolio && portfolio.slug) {
             baseRoutes.push({
-                route: `/view-design/${portfolio.slug}`,
+                route: `/portfolio`,
                 lastModified: portfolio.createdAt || now,
                 changeFrequency: "monthly",
                 priority: 0.7,

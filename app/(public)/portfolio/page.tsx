@@ -1,5 +1,4 @@
-import { getPortfolios, getRenderedHtml } from "@/lib/portfolios/actions";
-import { isFrameBlocked } from "@/lib/server/cloudflare-rendering";
+import { getPortfolios } from "@/lib/portfolios/actions";
 import { getLocale, getTranslations } from "next-intl/server";
 import { PortfolioGrid } from "@/components/public/portfolio-grid";
 import { Badge } from "@/components/ui/badge";
@@ -79,30 +78,7 @@ function PortfolioSkeleton() {
 async function PortfolioList() {
     const portfolios = await getPortfolios();
 
-    // Smart Fetch: Only proxy if the target site blocks iframes
-    const portfolioWithHtml = await Promise.all(
-        portfolios.map(async (p) => {
-            try {
-                if (!p.externalUrl) {
-                    return { ...p, html: "" };
-                }
-
-                // Check if site blocks iframes (Cached for 24h)
-                const blocked = await isFrameBlocked(p.externalUrl);
-
-                if (blocked) {
-                    return { ...p, html: await getRenderedHtml(p.externalUrl) };
-                }
-
-                return { ...p, html: "" }; // Empty HTML means use direct src
-            } catch (error) {
-                console.error(`[PortfolioList] Failed to process ${p.title}:`, error);
-                return { ...p, html: "" };
-            }
-        })
-    );
-
-    return <PortfolioGrid items={portfolioWithHtml} />;
+    return <PortfolioGrid items={portfolios} />;
 }
 
 export default async function PortfolioPage() {
@@ -139,7 +115,7 @@ export default async function PortfolioPage() {
                         "itemListElement": portfolios.map((p, index) => ({
                             "@type": "ListItem",
                             "position": index + 1,
-                            "url": `${baseUrl}/${locale}/view-design/${p.slug}`,
+                            "url": p.externalUrl || `${baseUrl}/${locale}/portfolio`,
                             "name": p.title
                         }))
                     }),
