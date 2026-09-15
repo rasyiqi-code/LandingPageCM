@@ -27,14 +27,18 @@ interface GitHubRepo {
 }
 
 async function fetchRepos(url: string): Promise<GitHubRepo[]> {
-    const headers: HeadersInit = {
-        Accept: "application/vnd.github.v3+json",
-    };
-    if (process.env.GITHUB_PAT) {
-        headers["Authorization"] = `token ${process.env.GITHUB_PAT}`;
-    }
+    const authToken = process.env.GITHUB_PAT;
+    // Jika token diset, coba dengan token dulu; kalau gagal (misal token invalid), coba tanpa token
+    const attempts = authToken ? 2 : 1;
 
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; attempt < attempts; attempt++) {
+        const headers: HeadersInit = {
+            Accept: "application/vnd.github.v3+json",
+        };
+        if (attempt === 0 && authToken) {
+            headers["Authorization"] = `token ${authToken}`;
+        }
+
         const res = await fetch(url, {
             headers,
             next: { revalidate: 2592000 } // Cache 30 hari
@@ -43,11 +47,9 @@ async function fetchRepos(url: string): Promise<GitHubRepo[]> {
             return (await res.json()) as GitHubRepo[];
         }
         console.warn(
-            `[Portfolios] GitHub ${url} -> ${res.status} (attempt ${attempt + 1}, ratelimit remaining: ${res.headers.get("x-ratelimit-remaining")})`
+            `[Portfolios] GitHub ${url} -> ${res.status} (${attempt === 0 && authToken ? "with token" : "anonymous"}, ratelimit remaining: ${res.headers.get("x-ratelimit-remaining")})`
         );
-        if (attempt === 0) {
-            await new Promise((resolve) => setTimeout(resolve, 500));
-        }
+        await new Promise((resolve) => setTimeout(resolve, 500));
     }
     return [];
 }
